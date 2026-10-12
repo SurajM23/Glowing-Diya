@@ -2,6 +2,7 @@ import { env, validateProductionConfig } from './config';
 import { migrate, openDb } from './db';
 import { createApp } from './app';
 import { seedDefaults } from './lib/seed';
+import { hashPassword } from './auth';
 
 async function start() {
   try {
@@ -20,6 +21,23 @@ async function start() {
 
     // Starting content only; the owner edits everything in the admin. Stock stays at 0 until added there.
     await seedDefaults(db, { demoStock: env.isProd ? 0 : 50 });
+
+    // Optional: create/reset the admin login from env vars, for hosts with no shell access.
+    // Safe to leave set after the first deploy — it just re-upserts the same account.
+    const adminEmail = process.env.ADMIN_EMAIL?.trim();
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    if (adminEmail && adminPassword) {
+      if (!/^\S+@\S+\.\S+$/.test(adminEmail) || adminPassword.length < 10) {
+        console.warn('[server] ADMIN_EMAIL/ADMIN_PASSWORD set but invalid (need a real email and a password of 10+ characters) — skipped.');
+      } else {
+        await db.q(
+          `INSERT INTO admin_users(email, password_hash) VALUES ($1,$2)
+           ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash`,
+          [adminEmail, await hashPassword(adminPassword)],
+        );
+        console.log(`[server] Admin account ready: ${adminEmail}`);
+      }
+    }
 
     const host = '0.0.0.0';
     createApp(db).listen(env.port, host, () => {
