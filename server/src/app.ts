@@ -20,6 +20,7 @@ import {
   ordersForCustomer, publicOrder, recordFailedAttempt, recordPayment, whatsappLink,
 } from './lib/orders';
 import { buildReport } from './lib/reports';
+import { notifyAdmins, vapidKeys } from './lib/push';
 
 const wrap = (fn: (req: Request, res: Response) => Promise<unknown>) => (req: Request, res: Response, next: NextFunction) =>
   fn(req, res).catch(next);
@@ -173,6 +174,14 @@ export function createApp(db: Db, opts: AppOptions = {}) {
       else { customerId = r.customer.id; issueCustomerSession(res, r.customer); }
     }
     const { order, duplicate } = await createOrder(db, s, body, key, router, customerId);
+    if (!duplicate) {
+      const boxes = order.items.reduce((a: number, i: any) => a + i.quantity, 0);
+      void notifyAdmins(db.q, {
+        title: `New order ${order.ref}`,
+        body: `${order.customer_name} · ${boxes} box${boxes === 1 ? '' : 'es'} · ₹${order.total} · PIN ${order.pin}`,
+        url: `/admin/orders/${order.id}`, tag: order.ref,
+      });
+    }
     res.status(duplicate ? 200 : 201).json({
       order: publicOrder(order), duplicate, whatsappUrl: whatsappLink(s, order), tracked: Boolean(order.customer_id), trackingNote,
     });
@@ -240,6 +249,31 @@ export function createApp(db: Db, opts: AppOptions = {}) {
       today: { orders: flags.today_orders, value: flags.today_value },
       stock: products.map((p: any) => ({ id: p.id, name: p.name, stock: p.stock, threshold: p.low_stock_threshold, low: p.stock <= p.low_stock_threshold })),
     });
+  }));
+
+  // ----- push notifications (admin phone app) -----
+
+  admin.get('/push/key', wrap(async (_req, res) => { res.json({ publicKey: (await vapidKeys(db.q)).publicKey }); }));
+
+  admin.post('/push/subscribe', wrap(async (req, res) => {
+    const b = z.object({ endpoint: z.string().url().max(1000), keys: z.object({ p256dh: z.string().max(200), auth: z.string().max(100) }) }).parse(req.body);
+    await db.q(
+      `INSERT INTO push_subscriptions(endpoint, p256dh, auth, admin_email) VALUES ($1,$2,$3,$4)
+       ON CONFLICT (endpoint) DO UPDATE SET p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth, admin_email = EXCLUDED.admin_email`,
+      [b.endpoint, b.keys.p256dh, b.keys.auth, actor(req)],
+    );
+    res.status(201).json({ ok: true });
+  }));
+
+  admin.post('/push/unsubscribe', wrap(async (req, res) => {
+    const { endpoint } = z.object({ endpoint: z.string().max(1000) }).parse(req.body);
+    await db.q('DELETE FROM push_subscriptions WHERE endpoint = $1', [endpoint]);
+    res.json({ ok: true });
+  }));
+
+  admin.post('/push/test', wrap(async (_req, res) => {
+    const sent = await notifyAdmins(db.q, { title: 'Notifications are on', body: 'New orders will appear here.', url: '/admin', tag: 'test' });
+    res.json({ sent });
   }));
 
   // ----- settings -----

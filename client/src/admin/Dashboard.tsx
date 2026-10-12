@@ -3,6 +3,7 @@ import { AlertTriangle, ArrowRight, CheckCircle2, Clock, IndianRupee, Inbox, Pac
 import { money } from '../api';
 import { useSummary } from './AdminLayout';
 import { useLoad } from './hooks';
+import Notifications from './Notifications';
 import { Empty, PageHeader, Panel, PaymentBadge, Skeleton, Stat, StatusBadge, relTime } from './ui';
 
 const monthStart = () => {
@@ -33,6 +34,8 @@ export default function Dashboard() {
         description={new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
         actions={<Link to="/admin/orders" className="btn-dark btn-sm"><ShoppingBag size={14} aria-hidden />All orders</Link>}
       />
+
+      <Notifications />
 
       {alerts.length > 0 && (
         <div className="mb-6 space-y-2">
