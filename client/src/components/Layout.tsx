@@ -12,7 +12,7 @@ export default function Layout() {
   const { pathname } = useLocation();
   useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
 
-  const link = ({ isActive }: { isActive: boolean }) => `px-2 py-1 text-sm font-medium ${isActive ? 'text-accent' : 'hover:text-accent'}`;
+  const link = ({ isActive }: { isActive: boolean }) => `px-1.5 py-1 text-sm font-medium sm:px-2 ${isActive ? 'text-accent' : 'hover:text-accent'}`;
   const wa = c.contact.whatsapp.replace(/\D/g, '');
 
   return (
@@ -21,14 +21,14 @@ export default function Layout() {
       {c.site.announcement && <div className="bg-dark px-4 py-2 text-center text-sm text-bg">{c.site.announcement}</div>}
       <header className="sticky top-0 z-40 border-b border-dark/10 bg-bg/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
-          <Link to="/" className="flex items-center gap-2 font-display text-xl font-bold text-dark">
-            {c.brand.logoUrl && <img src={assetUrl(c.brand.logoUrl)} alt="" className="h-10 w-10 object-contain" />}
-            {c.brand.name}
+          <Link to="/" className="flex min-w-0 items-center gap-2 font-display text-lg font-bold text-dark sm:text-xl">
+            {c.brand.logoUrl && <img src={assetUrl(c.brand.logoUrl)} alt="" className="h-9 w-9 shrink-0 object-contain sm:h-10 sm:w-10" />}
+            <span className="truncate">{c.brand.name}</span>
           </Link>
-          <nav className="flex items-center gap-2" aria-label="Main">
-            <NavLink to="/" end className={link}>Home</NavLink>
+          <nav className="flex shrink-0 items-center gap-0.5 sm:gap-2" aria-label="Main">
+            <NavLink to="/" end className={(a) => `${link(a)} hidden sm:inline-block`}>Home</NavLink>
             <NavLink to="/shop" className={link}>Shop</NavLink>
-            <NavLink to={customer ? '/account/orders' : '/account/login'} className={link}>{customer ? 'My orders' : 'Track order'}</NavLink>
+            <NavLink to={customer ? '/account/orders' : '/account/login'} className={link}>{customer ? 'My orders' : <><span className="sm:hidden">Track</span><span className="hidden sm:inline">Track order</span></>}</NavLink>
             <Link to="/checkout" className="btn-primary !px-4 !py-2" aria-label={`Cart, ${count} boxes`}>
               Cart{count > 0 && <span className="rounded-full bg-dark px-2 text-xs text-bg">{count}</span>}
             </Link>
