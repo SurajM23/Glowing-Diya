@@ -4,8 +4,9 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "start": "tsx src/index.ts",
-    "build": "tsc --noEmit",
+    "start": "node dist/index.js",
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/index.js",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "migrate": "tsx src/scripts/migrate.ts",
     "seed": "tsx src/scripts/seed.ts",
@@ -35,6 +36,7 @@
     "@types/node": "^22.9.0",
     "@types/pg": "^8.11.10",
     "@types/supertest": "^6.0.2",
+    "esbuild": "^0.24.2",
     "supertest": "^7.0.0",
     "typescript": "^5.6.3",
     "vitest": "^2.1.5"

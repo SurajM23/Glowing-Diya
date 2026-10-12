@@ -12,9 +12,11 @@ export const env = {
   mockKm: process.env.DISTANCE_MOCK_KM ? Number(process.env.DISTANCE_MOCK_KM) : null,
 };
 
-if (isProd && (env.jwtSecret === 'dev-only-secret' || env.jwtSecret.length < 32)) {
-  throw new Error('JWT_SECRET must be set to a long random value in production');
-}
-if (isProd && !env.databaseUrl) {
-  throw new Error('DATABASE_URL is required in production (embedded dev DB is not persistent)');
+export function validateProductionConfig() {
+  if (isProd && (env.jwtSecret === 'dev-only-secret' || env.jwtSecret.length < 32)) {
+    throw new Error('JWT_SECRET must be set to a long random value in production (at least 32 characters)');
+  }
+  if (isProd && !env.databaseUrl) {
+    throw new Error('DATABASE_URL is required in production (embedded dev DB is not persistent). Please set DATABASE_URL in your Render Environment settings.');
+  }
 }

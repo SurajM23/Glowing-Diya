@@ -10,7 +10,7 @@
     "seed": "npm run seed -w server",
     "create-admin": "npm run create-admin -w server",
     "backup": "npm run backup -w server",
-    "start": "npm start -w server"
+    "start": "node server/dist/index.js"
   },
   "devDependencies": {
     "concurrently": "^9.0.1"
