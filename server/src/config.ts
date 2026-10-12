@@ -25,11 +25,8 @@ export function validateProductionConfig() {
     console.warn('[server] Notice: Using auto-generated secure JWT_SECRET. To keep admin sessions persistent across restarts, set a 32+ character JWT_SECRET in your Render Environment settings.');
   }
   if (isProd && !env.databaseUrl) {
-    console.warn('================================================================');
-    console.warn('[server] WARNING: DATABASE_URL is not set in production!');
-    console.warn('[server] Using embedded PGlite database. Warning: disk storage is');
-    console.warn('[server] ephemeral on Render free tier. To persist orders and data,');
-    console.warn('[server] set DATABASE_URL in your Render Environment settings.');
-    console.warn('================================================================');
+    throw new Error(
+      'DATABASE_URL is required in production. Embedded PGlite is disabled in production to prevent memory exhaustion (>512 MiB) and data loss. Please set DATABASE_URL in your Render Environment settings.'
+    );
   }
 }

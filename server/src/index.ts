@@ -30,7 +30,13 @@ async function start() {
     console.error('[server] FATAL: Server failed to start');
     console.error(`[server] Error: ${err?.message || err}`);
     if (env.isProd && !env.databaseUrl) {
-      console.error('[server] Action required: Set DATABASE_URL in your Render Environment settings.');
+      console.error('[server]');
+      console.error('[server] ACTION REQUIRED ON RENDER:');
+      console.error('[server] 1. Create a PostgreSQL database in Render (New + -> PostgreSQL)');
+      console.error('[server] 2. Copy the "Internal Database URL" (or external URL from Neon/Supabase)');
+      console.error('[server] 3. In your Web Service dashboard -> "Environment" tab:');
+      console.error('[server]    Add environment variable: DATABASE_URL = <database-url>');
+      console.error('[server] 4. Save and redeploy.');
     }
     console.error('================================================================');
     process.exit(1);

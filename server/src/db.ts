@@ -1,7 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PGlite } from '@electric-sql/pglite';
 import pg from 'pg';
 import { env } from './config';
 
@@ -20,34 +19,45 @@ const migrationsDir = path.resolve(here, '../../database/migrations');
 pg.types.setTypeParser(20, (v) => Number(v));
 pg.types.setTypeParser(1700, (v) => Number(v));
 
-export async function openDb(opts: { memory?: boolean } = {}): Promise<Db> {
-  if (!opts.memory && env.databaseUrl) {
-    const pool = new pg.Pool({
-      connectionString: env.databaseUrl,
-      ssl: /localhost|127\.0\.0\.1/.test(env.databaseUrl) ? undefined : { rejectUnauthorized: false },
-      // The business runs on India time; every connection starts in that zone so now()/CURRENT_DATE
-      // ("orders today", report date ranges, expense dates) agree with the owner's clock.
-      options: '-c TimeZone=Asia/Kolkata',
-    });
-    return {
-      q: async (sql, params) => (await pool.query(sql, params as any[])).rows,
-      async tx(fn) {
-        const c = await pool.connect();
-        try {
-          await c.query('BEGIN');
-          const out = await fn(async (sql, params) => (await c.query(sql, params as any[])).rows);
-          await c.query('COMMIT');
-          return out;
-        } catch (e) {
-          await c.query('ROLLBACK');
-          throw e;
-        } finally {
-          c.release();
-        }
-      },
-      close: () => pool.end(),
-    };
-  }
+async function openPostgres(databaseUrl: string): Promise<Db> {
+  const pool = new pg.Pool({
+    connectionString: databaseUrl,
+    ssl: /localhost|127\.0\.0\.1/.test(databaseUrl) ? undefined : { rejectUnauthorized: false },
+    max: 10,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
+    // The business runs on India time; every connection starts in that zone so now()/CURRENT_DATE
+    // ("orders today", report date ranges, expense dates) agree with the owner's clock.
+    options: '-c TimeZone=Asia/Kolkata',
+  });
+
+  // Test the connection eagerly so network/auth errors are surfaced on startup
+  const client = await pool.connect();
+  client.release();
+
+  return {
+    q: async (sql, params) => (await pool.query(sql, params as any[])).rows,
+    async tx(fn) {
+      const c = await pool.connect();
+      try {
+        await c.query('BEGIN');
+        const out = await fn(async (sql, params) => (await c.query(sql, params as any[])).rows);
+        await c.query('COMMIT');
+        return out;
+      } catch (e) {
+        await c.query('ROLLBACK');
+        throw e;
+      } finally {
+        c.release();
+      }
+    },
+    close: () => pool.end(),
+  };
+}
+
+async function openPgLite(opts: { memory?: boolean } = {}): Promise<Db> {
+  // Dynamically import PGlite so its WASM binary is never loaded into memory in production
+  const { PGlite } = await import('@electric-sql/pglite');
   const dir = opts.memory ? undefined : path.resolve(here, '../.data/pgdata');
   if (dir) fs.mkdirSync(path.dirname(dir), { recursive: true });
   const lite = new PGlite(dir);
@@ -58,6 +68,24 @@ export async function openDb(opts: { memory?: boolean } = {}): Promise<Db> {
     tx: (fn) => lite.transaction((t) => fn(async (sql, params) => (await t.query(sql, params as any[])).rows as any[])),
     close: () => lite.close(),
   };
+}
+
+export async function openDb(opts: { memory?: boolean } = {}): Promise<Db> {
+  if (opts.memory) {
+    return openPgLite({ memory: true });
+  }
+
+  if (env.databaseUrl) {
+    return openPostgres(env.databaseUrl);
+  }
+
+  if (env.isProd) {
+    throw new Error(
+      'DATABASE_URL is required in production. Embedded PGlite is disabled in production to prevent memory exhaustion (>512 MiB) and data loss.'
+    );
+  }
+
+  return openPgLite({ memory: false });
 }
 
 export async function migrate(db: Db): Promise<string[]> {
