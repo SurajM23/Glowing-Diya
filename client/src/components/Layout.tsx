@@ -2,13 +2,11 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useEffect } from 'react';
 import { useConfig } from '../config';
 import { useCart } from '../cart';
-import { useAccount } from '../account';
 import { assetUrl } from '../api';
 
 export default function Layout() {
   const c = useConfig();
   const { count } = useCart();
-  const { customer } = useAccount();
   const { pathname } = useLocation();
   useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
 
@@ -28,7 +26,7 @@ export default function Layout() {
           <nav className="flex shrink-0 items-center gap-0.5 sm:gap-2" aria-label="Main">
             <NavLink to="/" end className={(a) => `${link(a)} hidden sm:inline-block`}>Home</NavLink>
             <NavLink to="/shop" className={link}>Shop</NavLink>
-            <NavLink to={customer ? '/account/orders' : '/account/login'} className={link}>{customer ? 'My orders' : <><span className="sm:hidden">Track</span><span className="hidden sm:inline">Track order</span></>}</NavLink>
+            <NavLink to="/track" className={link}><span className="sm:hidden">Track</span><span className="hidden sm:inline">Track order</span></NavLink>
             <Link to="/checkout" className="btn-primary !px-4 !py-2" aria-label={`Cart, ${count} boxes`}>
               Cart{count > 0 && <span className="rounded-full bg-dark px-2 text-xs text-bg">{count}</span>}
             </Link>

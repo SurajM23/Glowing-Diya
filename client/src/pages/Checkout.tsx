@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api, ApiError, money } from '../api';
 import { useCart } from '../cart';
-import { useAccount } from '../account';
 import { useConfig } from '../config';
 import { Notice, Section } from '../components/shared';
 import type { Estimate, PlacedOrder } from '../types';
@@ -12,9 +11,6 @@ const newKey = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-$
 export default function Checkout() {
   const { products, site, contact, delivery } = useConfig();
   const { lines, set, clear } = useCart();
-  const account = useAccount();
-  const [track, setTrack] = useState(false);
-  const [password, setPassword] = useState('');
   const nav = useNavigate();
   const [f, setF] = useState({ customerName: '', phone: '', address: '', pin: '', landmark: '', preferredDate: '', preferredTime: '', notes: '' });
   const [est, setEst] = useState<Estimate | null>(null);
@@ -62,24 +58,21 @@ export default function Checkout() {
     if (submitting) return;
     setError('');
     if (!validate()) return;
-    if (!account.customer && track && password.length < 8) { setError('Choose a password of at least 8 characters to track your order, or untick tracking.'); return; }
     const body = JSON.stringify({
       items, customerName: f.customerName.trim(), phone: f.phone.trim(), address: f.address.trim(), pin: f.pin,
       ...(f.landmark.trim() && { landmark: f.landmark.trim() }),
       ...(f.preferredDate && { preferredDate: f.preferredDate }),
       ...(f.preferredTime.trim() && { preferredTime: f.preferredTime.trim() }),
       ...(f.notes.trim() && { notes: f.notes.trim() }),
-      ...(!account.customer && track && { trackOrder: true, password }),
     });
     if (!attempt.current || attempt.current.body !== body) attempt.current = { body, key: newKey() };
     setSubmitting(true);
     try {
-      const res = await api<{ order: PlacedOrder; whatsappUrl: string | null; tracked: boolean; trackingNote: string | null }>('/orders', {
+      const res = await api<{ order: PlacedOrder; whatsappUrl: string | null }>('/orders', {
         method: 'POST', headers: { 'Idempotency-Key': attempt.current.key }, body: JSON.parse(body),
       });
       try { sessionStorage.setItem(`gd_order_${res.order.ref}`, JSON.stringify(res)); } catch { /* optional */ }
       clear();
-      if (res.tracked && !account.customer) account.refresh();
       nav(`/order/${res.order.ref}`, { state: res });
     } catch (e) {
       setError((e as Error).message);
@@ -135,19 +128,6 @@ export default function Checkout() {
             <Field id="notes" label="Notes (optional)"><textarea id="notes" rows={2} className="input" value={f.notes} onChange={up('notes')} /></Field>
           </div>
 
-          <div className="card space-y-3">
-            {account.customer ? (
-              <p className="text-sm">This order will appear in <strong>My orders</strong> for {account.customer.name}, so you can track it.</p>
-            ) : (
-              <>
-                <label className="flex items-start gap-3 text-sm">
-                  <input type="checkbox" className="mt-0.5 h-4 w-4" checked={track} onChange={(e) => setTrack(e.target.checked)} />
-                  <span><strong>Track this order (optional)</strong><span className="block opacity-70">Choose a password and sign in later with your phone number to see your order status.</span></span>
-                </label>
-                {track && <Field id="acc-pw" label="Password (at least 8 characters)"><input id="acc-pw" type="password" autoComplete="new-password" className="input" value={password} onChange={(e) => setPassword(e.target.value)} /></Field>}
-              </>
-            )}
-          </div>
         </div>
 
         <aside className="lg:sticky lg:top-24 lg:self-start">

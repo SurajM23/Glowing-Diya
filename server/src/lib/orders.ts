@@ -130,7 +130,7 @@ function makeRef(prefix: string) {
   return `${prefix}-${istDateStamp()}-${rand}`;
 }
 
-export async function createOrder(db: Db, s: Settings, input: CreateOrderInput, idempotencyKey: string, router?: Router | null, customerId: number | null = null) {
+export async function createOrder(db: Db, s: Settings, input: CreateOrderInput, idempotencyKey: string, router?: Router | null) {
   const existing = await db.q<any>('SELECT id FROM orders WHERE idempotency_key = $1', [idempotencyKey]);
   if (existing.length) return { order: await getOrder(db.q, existing[0].id), duplicate: true };
 
@@ -149,10 +149,10 @@ export async function createOrder(db: Db, s: Settings, input: CreateOrderInput, 
       const [campaign] = await q<any>('SELECT id FROM campaigns WHERE active LIMIT 1');
       const [o] = await q<{ id: number }>(
         `INSERT INTO orders(ref, idempotency_key, campaign_id, customer_name, phone, address, pin, landmark, preferred_slot,
-           customer_notes, subtotal, delivery_fee, total, needs_review, customer_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id`,
+           customer_notes, subtotal, delivery_fee, total, needs_review)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id`,
         [makeRef(s.orders.refPrefix), idempotencyKey, campaign?.id ?? null, input.customerName, input.phone, input.address, input.pin,
-          input.landmark ?? '', slot, input.notes ?? '', est.subtotal, est.deliveryFee, est.total, est.delivery?.status !== 'ok', customerId],
+          input.landmark ?? '', slot, input.notes ?? '', est.subtotal, est.deliveryFee, est.total, est.delivery?.status !== 'ok'],
       );
       for (const l of est.lines) {
         await q('INSERT INTO order_items(order_id, product_id, name, quantity, unit_price, unit_cost) VALUES ($1,$2,$3,$4,$5,$6)',
@@ -206,8 +206,18 @@ export function publicOrder(o: any) {
   };
 }
 
-export async function ordersForCustomer(q: Q, customerId: number) {
-  const rows = await q<{ id: number }>('SELECT id FROM orders WHERE customer_id = $1 ORDER BY created_at DESC LIMIT 50', [customerId]);
+/**
+ * Passwordless tracking: a phone number plus any one of that phone's order references proves it's
+ * the customer, and returns all their orders. The reference is in the WhatsApp message they sent.
+ */
+export async function trackByRef(q: Q, phone: string, ref: string) {
+  const last10 = phone.replace(/[^0-9]/g, '').slice(-10);
+  if (last10.length !== 10) return null;
+  const match = await q<{ id: number }>(
+    `SELECT id FROM orders WHERE upper(ref) = upper($1) AND right(regexp_replace(phone, '[^0-9]', '', 'g'), 10) = $2`, [ref.trim(), last10]);
+  if (!match.length) return null;
+  const rows = await q<{ id: number }>(
+    `SELECT id FROM orders WHERE right(regexp_replace(phone, '[^0-9]', '', 'g'), 10) = $1 ORDER BY created_at DESC LIMIT 50`, [last10]);
   return Promise.all(rows.map(async (r) => publicOrder(await getOrder(q, r.id))));
 }
 

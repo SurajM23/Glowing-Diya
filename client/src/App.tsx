@@ -12,7 +12,7 @@ import { ProductPage, Shop } from './pages/Shop';
 import Checkout from './pages/Checkout';
 import OrderDone from './pages/OrderDone';
 import { Privacy, Terms } from './pages/Legal';
-import { AccountLogin, AccountOrders } from './pages/Account';
+import Track from './pages/Track';
 import { Section } from './components/shared';
 
 export default function App() {
@@ -37,8 +37,7 @@ export default function App() {
         <Route path="shop/:slug" element={<ProductPage />} />
         <Route path="checkout" element={<Checkout />} />
         <Route path="order/:ref" element={<OrderDone />} />
-        <Route path="account/login" element={<AccountLogin />} />
-        <Route path="account/orders" element={<AccountOrders />} />
+        <Route path="track" element={<Track />} />
         <Route path="privacy" element={<Privacy />} />
         <Route path="terms" element={<Terms />} />
         <Route path="*" element={<Section title="Page not found"><Link className="underline" to="/">Go home</Link></Section>} />

@@ -9,15 +9,12 @@ import rateLimit from 'express-rate-limit';
 import { z, ZodError } from 'zod';
 import type { Db } from './db';
 import { env } from './config';
-import {
-  checkPassword, clearCustomerSession, clearSession, issueCustomerSession, issueSession, optionalCustomer, requireAdmin, requireCustomer,
-} from './auth';
-import { linkAtCheckout, verifyLogin } from './lib/customers';
+import { checkPassword, clearSession, issueSession, requireAdmin } from './auth';
 import { DEFAULT_SETTINGS, SETTING_KEYS, audit, getSettings, saveSetting, type SettingKey, type Settings } from './lib/settings';
 import { defaultRouter, type Router } from './lib/delivery';
 import {
   HttpError, ORDER_STATUSES, changeStatus, createOrder, estimate, getOrder, listProducts,
-  ordersForCustomer, publicOrder, recordFailedAttempt, recordPayment, whatsappLink,
+  publicOrder, trackByRef, recordFailedAttempt, recordPayment, whatsappLink,
 } from './lib/orders';
 import { buildReport } from './lib/reports';
 import { notifyAdmins, vapidKeys } from './lib/push';
@@ -56,9 +53,6 @@ const orderBody = z.object({
   preferredDate: isoDate.optional(),
   preferredTime: z.string().trim().max(50).optional(),
   notes: z.string().trim().max(500).optional(),
-  // Optional: create (or sign in to) an account so the customer can track this order later
-  trackOrder: z.boolean().optional(),
-  password: z.string().min(8, 'Password must be at least 8 characters').max(100).optional(),
 });
 
 const nullableNum = z.number().min(0).nullable();
@@ -115,7 +109,6 @@ export function createApp(db: Db, opts: AppOptions = {}) {
   const api = express.Router();
   app.use('/api', api);
   api.use(limit(60_000, 240));
-  api.use(optionalCustomer);
 
   api.get('/health', wrap(async (_req, res) => {
     await db.q('SELECT 1');
@@ -165,15 +158,7 @@ export function createApp(db: Db, opts: AppOptions = {}) {
     if (!/^[A-Za-z0-9_-]{16,100}$/.test(key)) throw new HttpError(400, 'Missing or invalid Idempotency-Key header');
     const body = orderBody.parse(req.body);
     const s = await settings();
-    let customerId = req.customer?.id ?? null;
-    let trackingNote: string | null = null;
-    if (!customerId && body.trackOrder) {
-      if (!body.password) throw new HttpError(400, 'Choose a password to track your order');
-      const r = await linkAtCheckout(db.q, body.phone, body.customerName, body.password);
-      if ('error' in r) trackingNote = r.error;
-      else { customerId = r.customer.id; issueCustomerSession(res, r.customer); }
-    }
-    const { order, duplicate } = await createOrder(db, s, body, key, router, customerId);
+    const { order, duplicate } = await createOrder(db, s, body, key, router);
     if (!duplicate) {
       const boxes = order.items.reduce((a: number, i: any) => a + i.quantity, 0);
       void notifyAdmins(db.q, {
@@ -183,25 +168,18 @@ export function createApp(db: Db, opts: AppOptions = {}) {
       });
     }
     res.status(duplicate ? 200 : 201).json({
-      order: publicOrder(order), duplicate, whatsappUrl: whatsappLink(s, order), tracked: Boolean(order.customer_id), trackingNote,
+      order: publicOrder(order), duplicate, whatsappUrl: whatsappLink(s, order),
     });
   }));
 
-  // ----- customer accounts (optional, for order tracking) -----
+  // ----- order tracking without an account -----
 
-  const account = express.Router();
-  api.use('/account', account);
-
-  account.post('/login', limit(15 * 60_000, 20), wrap(async (req, res) => {
-    const b = z.object({ phone, password: z.string().min(1).max(100) }).parse(req.body);
-    const c = await verifyLogin(db.q, b.phone, b.password);
-    if (!c) throw new HttpError(401, 'Incorrect phone number or password');
-    issueCustomerSession(res, c);
-    res.json(c);
+  api.post('/track', limit(15 * 60_000, 15), wrap(async (req, res) => {
+    const b = z.object({ phone, ref: z.string().trim().min(6).max(40) }).parse(req.body);
+    const orders = await trackByRef(db.q, b.phone, b.ref);
+    if (!orders) throw new HttpError(404, 'No order found for that phone number and order number. Check both and try again.');
+    res.json(orders);
   }));
-  account.post('/logout', (_req, res) => { clearCustomerSession(res); res.json({ ok: true }); });
-  account.get('/me', requireCustomer, (req, res) => { res.json(req.customer); });
-  account.get('/orders', requireCustomer, wrap(async (req, res) => { res.json(await ordersForCustomer(db.q, req.customer!.id)); }));
 
   // ----- admin auth -----
 

@@ -5,7 +5,7 @@ import { useConfig } from '../config';
 import { Section } from '../components/shared';
 import type { PlacedOrder } from '../types';
 
-type State = { order: PlacedOrder; whatsappUrl: string | null; tracked?: boolean; trackingNote?: string | null };
+type State = { order: PlacedOrder; whatsappUrl: string | null };
 
 function restore(ref: string | undefined, fromNav: State | null): State | null {
   if (fromNav?.order?.ref === ref) return fromNav;
@@ -40,7 +40,7 @@ export default function OrderDone() {
       </Section>
     );
   }
-  const { order, whatsappUrl, tracked, trackingNote } = data;
+  const { order, whatsappUrl } = data;
   return (
     <Section title="Your order is saved">
       <div className="grid gap-6 lg:grid-cols-2">
@@ -56,8 +56,7 @@ export default function OrderDone() {
             <p className="text-sm">WhatsApp is not available right now. Keep your reference <strong>{order.ref}</strong> and contact us to confirm.</p>
           )}
           {whatsappUrl && <p className="text-xs opacity-70">WhatsApp did not open? Tap the button again. Your order stays saved.</p>}
-          {tracked && <Link to="/account/orders" className="btn-outline w-full">Track this order</Link>}
-          {trackingNote && <p className="rounded-lg bg-primary/10 px-3 py-2 text-xs">{trackingNote}</p>}
+          <p className="text-xs opacity-70">Track it any time: tap <Link className="underline" to="/track">Track order</Link> and enter your mobile number and order ID <strong>{order.ref}</strong>.</p>
           <Link to="/" className="btn-outline w-full">Back to home</Link>
         </div>
         <div className="card space-y-2 text-sm">
