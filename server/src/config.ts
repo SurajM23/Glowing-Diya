@@ -1,6 +1,9 @@
 import 'dotenv/config';
 
-const isProd = process.env.NODE_ENV === 'production';
+// NODE_ENV === 'production' normally, but also treat "running on Render" as production even if
+// NODE_ENV didn't reach the process as expected — otherwise the app can silently fall back to the
+// dev-only embedded database, whose in-memory Postgres engine OOMs a 512MB instance.
+const isProd = process.env.NODE_ENV === 'production' || Boolean(process.env.RENDER);
 
 export const env = {
   isProd,
