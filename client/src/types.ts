@@ -34,4 +34,6 @@ export interface PlacedOrder {
   items: { name: string; quantity: number; unitPrice: number }[];
   subtotal: number; deliveryFee: number; total: number; needsReview: boolean;
   quote: { status: string; billedKm: number | null; note: string } | null;
+  createdAt?: string;
+  history?: { status: string; at: string }[];
 }

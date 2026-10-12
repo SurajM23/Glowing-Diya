@@ -130,7 +130,7 @@ function makeRef(prefix: string) {
   return `${prefix}-${istDateStamp()}-${rand}`;
 }
 
-export async function createOrder(db: Db, s: Settings, input: CreateOrderInput, idempotencyKey: string, router?: Router | null) {
+export async function createOrder(db: Db, s: Settings, input: CreateOrderInput, idempotencyKey: string, router?: Router | null, customerId: number | null = null) {
   const existing = await db.q<any>('SELECT id FROM orders WHERE idempotency_key = $1', [idempotencyKey]);
   if (existing.length) return { order: await getOrder(db.q, existing[0].id), duplicate: true };
 
@@ -149,10 +149,10 @@ export async function createOrder(db: Db, s: Settings, input: CreateOrderInput, 
       const [campaign] = await q<any>('SELECT id FROM campaigns WHERE active LIMIT 1');
       const [o] = await q<{ id: number }>(
         `INSERT INTO orders(ref, idempotency_key, campaign_id, customer_name, phone, address, pin, landmark, preferred_slot,
-           customer_notes, subtotal, delivery_fee, total, needs_review)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id`,
+           customer_notes, subtotal, delivery_fee, total, needs_review, customer_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id`,
         [makeRef(s.orders.refPrefix), idempotencyKey, campaign?.id ?? null, input.customerName, input.phone, input.address, input.pin,
-          input.landmark ?? '', slot, input.notes ?? '', est.subtotal, est.deliveryFee, est.total, est.delivery?.status !== 'ok'],
+          input.landmark ?? '', slot, input.notes ?? '', est.subtotal, est.deliveryFee, est.total, est.delivery?.status !== 'ok', customerId],
       );
       for (const l of est.lines) {
         await q('INSERT INTO order_items(order_id, product_id, name, quantity, unit_price, unit_cost) VALUES ($1,$2,$3,$4,$5,$6)',
@@ -193,6 +193,22 @@ export async function getOrder(q: Q, id: number | string, by: 'id' | 'ref' = 'id
     q<any>('SELECT * FROM delivery_attempts WHERE order_id = $1 ORDER BY id', [o.id]),
   ]);
   return { ...o, items, quote: quotes[0] ?? null, history, payments, attempts };
+}
+
+// The customer's own view of an order: no internal notes, payments, staff names or notes in history.
+export function publicOrder(o: any) {
+  return {
+    ref: o.ref, status: o.status, createdAt: o.created_at, customerName: o.customer_name, address: o.address, pin: o.pin,
+    items: o.items.map((i: any) => ({ name: i.name, quantity: i.quantity, unitPrice: i.unit_price })),
+    subtotal: o.subtotal, deliveryFee: o.delivery_fee, total: o.total, needsReview: o.needs_review, paymentStatus: o.payment_status,
+    quote: o.quote ? { status: o.quote.status, billedKm: o.quote.billed_km, note: o.quote.note } : null,
+    history: (o.history ?? []).map((h: any) => ({ status: h.to_status, at: h.created_at })),
+  };
+}
+
+export async function ordersForCustomer(q: Q, customerId: number) {
+  const rows = await q<{ id: number }>('SELECT id FROM orders WHERE customer_id = $1 ORDER BY created_at DESC LIMIT 50', [customerId]);
+  return Promise.all(rows.map(async (r) => publicOrder(await getOrder(q, r.id))));
 }
 
 // ---------- WhatsApp ----------
