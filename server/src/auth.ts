@@ -15,15 +15,16 @@ export function issueSession(res: Response, admin: { id: number; email: string }
   res.cookie(COOKIE, token, {
     httpOnly: true,
     secure: env.isProd,
-    // The client and API are on different sites in production (Vercel + Render)
-    sameSite: env.isProd ? 'none' : 'lax',
+    // Client and API are served from the same origin (see app.ts), so 'lax' always applies —
+    // no third-party-cookie issues on Safari/iOS, unlike a 'none' cookie across two hosts.
+    sameSite: 'lax',
     maxAge: MAX_AGE_MS,
     path: '/',
   });
 }
 
 export function clearSession(res: Response) {
-  res.clearCookie(COOKIE, { httpOnly: true, secure: env.isProd, sameSite: env.isProd ? 'none' : 'lax', path: '/' });
+  res.clearCookie(COOKIE, { httpOnly: true, secure: env.isProd, sameSite: 'lax', path: '/' });
 }
 
 declare module 'express-serve-static-core' {

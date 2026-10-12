@@ -76,9 +76,15 @@ export default function Home() {
       {c.site.showSections.delivery && (
         <Section title="Delivery">
           <div className="card max-w-2xl space-y-2 text-sm">
-            <p>Delivery is charged by distance: <strong>{money(c.delivery.ratePerKm, c.site.currency)} per km</strong>{c.delivery.roundUpKm ? ', with the distance rounded up to the next whole km' : ''}, measured one way from {c.contact.address || 'our location'}.</p>
-            <p>You see the delivery charge before you place your order. If we cannot locate your address, the owner confirms the charge with you on WhatsApp.</p>
-            {c.delivery.maxRadiusKm != null && <p>We deliver within {c.delivery.maxRadiusKm} km.</p>}
+            {c.delivery.flatFee != null ? (
+              <p>Delivery is a flat <strong>{money(c.delivery.flatFee, c.site.currency)}</strong> on every order, wherever you are in our delivery area.</p>
+            ) : (
+              <>
+                <p>Delivery is charged by distance: <strong>{money(c.delivery.ratePerKm, c.site.currency)} per km</strong>{c.delivery.roundUpKm ? ', with the distance rounded up to the next whole km' : ''}, measured one way from {c.contact.address || 'our location'}.</p>
+                <p>You see the delivery charge before you place your order. If we cannot locate your address, the owner confirms the charge with you on WhatsApp.</p>
+              </>
+            )}
+            {c.delivery.maxRadiusKm != null && c.delivery.flatFee == null && <p>We deliver within {c.delivery.maxRadiusKm} km.</p>}
             <p>Orders are usually delivered within {c.delivery.promiseHours} hours of confirmation, between {c.contact.openTime} and {c.contact.closeTime}.</p>
           </div>
         </Section>

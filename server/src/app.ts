@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
@@ -59,7 +62,7 @@ const settingSchemas: Record<SettingKey, z.ZodTypeAny> = {
     openTime: z.string().regex(/^\d{2}:\d{2}$/), closeTime: z.string().regex(/^\d{2}:\d{2}$/), instagram: z.string().max(200), facebook: z.string().max(200),
   }),
   delivery: z.object({
-    ratePerKm: z.number().min(0), roundUpKm: z.boolean(), maxRadiusKm: nullableNum, dailyCapacity: nullableNum, promiseHours: z.number().int().min(1),
+    flatFee: nullableNum, ratePerKm: z.number().min(0), roundUpKm: z.boolean(), maxRadiusKm: nullableNum, dailyCapacity: nullableNum, promiseHours: z.number().int().min(1),
     blackoutDates: z.array(isoDate), baseLat: z.number().nullable(), baseLng: z.number().nullable(), freeWithinBasePin: z.boolean(),
   }),
   payment: z.object({ upi: z.boolean(), cash: z.boolean(), upiId: z.string().max(100), upiNote: z.string().max(300) }),
@@ -530,6 +533,15 @@ export function createApp(db: Db, opts: AppOptions = {}) {
     const [m] = await db.q<{ id: number }>('INSERT INTO media(mime, data) VALUES ($1,$2) RETURNING id', [b.mime, data]);
     res.status(201).json({ id: m.id, url: `/api/media/${m.id}` });
   }));
+
+  // ----- built client (production: one service, one origin, so the admin cookie and deep links just work) -----
+
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const clientDist = path.resolve(here, '../../client/dist');
+  if (env.isProd && fs.existsSync(path.join(clientDist, 'index.html'))) {
+    app.use(express.static(clientDist, { index: false }));
+    app.get(/^(?!\/api\/).*/, (_req, res) => res.sendFile(path.join(clientDist, 'index.html')));
+  }
 
   // ----- errors -----
 

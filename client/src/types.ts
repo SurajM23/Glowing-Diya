@@ -13,7 +13,7 @@ export interface Campaign {
 export interface SiteConfig {
   brand: { name: string; tagline: string; logoUrl: string; faviconUrl: string; ownerName: string };
   contact: { whatsapp: string; phone: string; email: string; address: string; pin: string; openTime: string; closeTime: string; instagram: string; facebook: string };
-  delivery: { ratePerKm: number; roundUpKm: boolean; maxRadiusKm: number | null; promiseHours: number; blackoutDates: string[]; dailyCapacity: number | null; freeWithinBasePin: boolean };
+  delivery: { flatFee: number | null; ratePerKm: number; roundUpKm: boolean; maxRadiusKm: number | null; promiseHours: number; blackoutDates: string[]; dailyCapacity: number | null; freeWithinBasePin: boolean };
   payment: { upi: boolean; cash: boolean; upiId: string; upiNote: string };
   site: {
     announcement: string; currency: string;

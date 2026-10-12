@@ -8,8 +8,22 @@ async function productId(db: any) {
 }
 
 describe('POST /api/orders', () => {
-  it('saves the order with server-side pricing and a WhatsApp link', async () => {
-    const { db, app } = await testApp({ km: 4.2 });
+  it('charges the flat delivery fee by default, on every order', async () => {
+    const { db, app } = await testApp();
+    const pid = await productId(db);
+    const res = await request(app).post('/api/orders').set('Idempotency-Key', key()).send(orderPayload(pid, 3));
+    expect(res.status).toBe(201);
+    expect(res.body.order).toMatchObject({ subtotal: 360, deliveryFee: 40, total: 400, status: 'new_enquiry', needsReview: false });
+    expect(res.body.order.ref).toMatch(/^GD-\d{8}-[A-F0-9]{6}$/);
+    expect(res.body.order.quote.status).toBe('ok');
+    // No WhatsApp number configured yet: no link is invented
+    expect(res.body.whatsappUrl).toBeNull();
+    const [{ n }] = await db.q('SELECT COUNT(*)::int AS n FROM orders');
+    expect(n).toBe(1);
+  });
+
+  it('saves the order with server-side distance pricing and a WhatsApp link, when the flat fee is turned off', async () => {
+    const { db, app } = await testApp({ km: 4.2, flatFee: null });
     const pid = await productId(db);
     const res = await request(app).post('/api/orders').set('Idempotency-Key', key()).send(orderPayload(pid, 3));
     expect(res.status).toBe(201);
@@ -90,8 +104,8 @@ describe('POST /api/orders', () => {
     }
   });
 
-  it('sends the order to manual review, with no invented fee, when the address cannot be located', async () => {
-    const { db, app } = await testApp({ km: null });
+  it('sends the order to manual review, with no invented fee, when the address cannot be located and no flat fee is set', async () => {
+    const { db, app } = await testApp({ km: null, flatFee: null });
     const pid = await productId(db);
     const res = await request(app).post('/api/orders').set('Idempotency-Key', key()).send(orderPayload(pid, 1));
     expect(res.status).toBe(201);
@@ -100,11 +114,12 @@ describe('POST /api/orders', () => {
   });
 
   it('snapshots prices and the quote so later changes do not rewrite the order', async () => {
-    const { db, app } = await testApp({ km: 4.2 });
+    const { db, app } = await testApp({ km: 4.2, flatFee: null });
     const pid = await productId(db);
     const created = await request(app).post('/api/orders').set('Idempotency-Key', key()).send(orderPayload(pid, 2));
     await db.q('UPDATE price_tiers SET unit_price = 999');
-    await db.q(`INSERT INTO settings(key, value) VALUES ('delivery', '{"ratePerKm": 50}'::jsonb)`);
+    await db.q(`INSERT INTO settings(key, value) VALUES ('delivery', '{"ratePerKm": 50}'::jsonb)
+      ON CONFLICT (key) DO UPDATE SET value = settings.value || EXCLUDED.value`);
     const [o] = await db.q('SELECT * FROM orders WHERE ref = $1', [created.body.order.ref]);
     const [i] = await db.q('SELECT * FROM order_items WHERE order_id = $1', [o.id]);
     const [qt] = await db.q('SELECT * FROM delivery_quotes WHERE order_id = $1', [o.id]);
@@ -124,7 +139,7 @@ describe('POST /api/orders', () => {
 
 describe('POST /api/orders/estimate', () => {
   it('quotes without saving anything', async () => {
-    const { db, app } = await testApp({ km: 6.5 });
+    const { db, app } = await testApp({ km: 6.5, flatFee: null });
     const pid = await productId(db);
     const res = await request(app).post('/api/orders/estimate').send({ items: [{ productId: pid, quantity: 2 }], address: '1 Test Road', pin: '411046' });
     expect(res.status).toBe(200);
@@ -143,5 +158,6 @@ describe('public config', () => {
     expect(res.body.products[0].tiers).toEqual([{ minQty: 1, unitPrice: 150 }, { minQty: 2, unitPrice: 120 }]);
     expect(res.body.costs).toBeUndefined();
     expect(res.body.delivery.baseLat).toBeUndefined();
+    expect(res.body.delivery.flatFee).toBe(40);
   });
 });

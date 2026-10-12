@@ -21,6 +21,9 @@ export const DEFAULT_SETTINGS = {
     facebook: '',
   },
   delivery: {
+    // A flat fee charged on every order, no distance lookup needed. Set to null to switch to
+    // the per-km pricing below (needs a maps/geocoding provider configured via ORS_API_KEY).
+    flatFee: 40 as number | null,
     ratePerKm: 3,
     roundUpKm: true,
     maxRadiusKm: null as number | null,

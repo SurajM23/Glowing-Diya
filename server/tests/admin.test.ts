@@ -87,15 +87,15 @@ describe('order management', () => {
   it('tracks payments, partial payment and refunds', async () => {
     const { db, app } = await testApp();
     const cookie = await login(app);
-    const id = await newOrder(app, db, 2); // 240 + 15
+    const id = await newOrder(app, db, 2); // 240 + flat 40 fee = 280
     const pay = (body: object) => request(app).post(`/api/admin/orders/${id}/payments`).set('Cookie', cookie).send(body);
     expect((await pay({ method: 'upi', amount: 100 })).body.payment_status).toBe('partially_paid');
-    expect((await pay({ method: 'upi', amount: 155 })).body.payment_status).toBe('paid');
-    expect((await pay({ kind: 'refund', method: 'upi', amount: 255 })).body.payment_status).toBe('refunded');
+    expect((await pay({ method: 'upi', amount: 180 })).body.payment_status).toBe('paid');
+    expect((await pay({ kind: 'refund', method: 'upi', amount: 280 })).body.payment_status).toBe('refunded');
   });
 
   it('lets the owner set the fee on a manual-review order', async () => {
-    const { db, app } = await testApp({ km: null });
+    const { db, app } = await testApp({ km: null, flatFee: null });
     const cookie = await login(app);
     const id = await newOrder(app, db, 1);
     const res = await request(app).patch(`/api/admin/orders/${id}`).set('Cookie', cookie).send({ deliveryFee: 40 });
@@ -106,7 +106,7 @@ describe('order management', () => {
 
 describe('summary', () => {
   it('counts orders by status, review flags and stock', async () => {
-    const { db, app } = await testApp({ stock: 6, km: null });
+    const { db, app } = await testApp({ stock: 6, km: null, flatFee: null });
     const cookie = await login(app);
     expect((await request(app).get('/api/admin/summary')).status).toBe(401);
     await newOrder(app, db, 2);
@@ -170,15 +170,15 @@ describe('reports', () => {
     const { db, app } = await testApp();
     const cookie = await login(app);
     await db.q('UPDATE products SET unit_cost = 80');
-    const id = await newOrder(app, db, 2); // revenue 240 + 15, cost 160
+    const id = await newOrder(app, db, 2); // revenue 240 + flat 40 fee, cost 160
     for (const s of ['confirmed', 'ready_for_delivery', 'out_for_delivery', 'delivered']) {
       await request(app).post(`/api/admin/orders/${id}/status`).set('Cookie', cookie).send({ status: s });
     }
     await newOrder(app, db, 1); // still open: must not count
     await request(app).post('/api/admin/expenses').set('Cookie', cookie).send({ description: 'Packaging', amount: 30 });
     const r = (await request(app).get('/api/admin/reports').set('Cookie', cookie)).body;
-    expect(r).toMatchObject({ deliveredOrders: 1, productRevenue: 240, deliveryRevenue: 15, productCost: 160, productProfit: 80, otherExpenses: 30 });
-    expect(r.estimatedProfit).toBe(80 + 15 - 30);
+    expect(r).toMatchObject({ deliveredOrders: 1, productRevenue: 240, deliveryRevenue: 40, productCost: 160, productProfit: 80, otherExpenses: 30 });
+    expect(r.estimatedProfit).toBe(80 + 40 - 30);
     expect(r.warnings.join(' ')).toMatch(/mileage/i);
   });
 

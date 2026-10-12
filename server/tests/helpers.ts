@@ -16,10 +16,13 @@ export async function testDb(stock = 10): Promise<Db> {
   return db;
 }
 
-export async function testApp(opts: { stock?: number; km?: number | null } = {}) {
+export async function testApp(opts: { stock?: number; km?: number | null; flatFee?: number | null } = {}) {
   const db = await testDb(opts.stock ?? 10);
   const app = createApp(db, { router: fixedRouter(opts.km === undefined ? 4.2 : opts.km), rateLimit: false });
   await db.q('INSERT INTO admin_users(email, password_hash) VALUES ($1,$2)', ['owner@test.dev', await hashPassword('correct-horse-battery')]);
+  // Production default is a flat fee (set in lib/settings.ts). Pass flatFee to override it, e.g.
+  // `flatFee: null` to exercise the per-km/manual-review path that only applies without one.
+  if (opts.flatFee !== undefined) await db.q('INSERT INTO settings(key, value) VALUES ($1, $2::jsonb)', ['delivery', JSON.stringify({ flatFee: opts.flatFee })]);
   return { db, app };
 }
 

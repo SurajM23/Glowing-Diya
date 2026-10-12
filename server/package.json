@@ -9,7 +9,8 @@
     "test": "vitest run",
     "migrate": "tsx src/scripts/migrate.ts",
     "seed": "tsx src/scripts/seed.ts",
-    "create-admin": "tsx src/scripts/createAdmin.ts"
+    "create-admin": "tsx src/scripts/createAdmin.ts",
+    "backup": "tsx src/scripts/backup.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.2.12",

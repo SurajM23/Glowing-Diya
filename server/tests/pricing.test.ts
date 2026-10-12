@@ -41,8 +41,12 @@ describe('delivery quote', () => {
 });
 
 describe('business hours', () => {
-  it('checks the window', () => {
-    expect(withinHours('09:00', '22:00', new Date(2025, 0, 1, 10, 0))).toBe(true);
-    expect(withinHours('09:00', '22:00', new Date(2025, 0, 1, 23, 0))).toBe(false);
+  // Instants given in UTC so the test is independent of the machine's own timezone;
+  // withinHours() must read them as India time (UTC+5:30) regardless.
+  it('checks the window in India time, not the server clock', () => {
+    expect(withinHours('09:00', '22:00', new Date('2025-01-01T04:30:00Z'))).toBe(true); // 10:00 IST
+    expect(withinHours('09:00', '22:00', new Date('2025-01-01T17:30:00Z'))).toBe(false); // 23:00 IST
+    expect(withinHours('09:00', '22:00', new Date('2025-01-01T03:29:00Z'))).toBe(false); // 08:59 IST
+    expect(withinHours('09:00', '22:00', new Date('2025-01-01T03:30:00Z'))).toBe(true); // 09:00 IST
   });
 });

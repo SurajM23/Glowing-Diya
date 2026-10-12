@@ -9,6 +9,7 @@
     "migrate": "npm run migrate -w server",
     "seed": "npm run seed -w server",
     "create-admin": "npm run create-admin -w server",
+    "backup": "npm run backup -w server",
     "start": "npm start -w server"
   },
   "devDependencies": {

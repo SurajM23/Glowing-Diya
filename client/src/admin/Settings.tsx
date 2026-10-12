@@ -38,6 +38,7 @@ const LABELS: Record<string, string> = {
   name: 'Business name', tagline: 'Tagline', logoUrl: 'Logo', faviconUrl: 'Browser tab icon', ownerName: 'Owner name',
   whatsapp: 'WhatsApp number (receives orders)', phone: 'Phone', email: 'Email', address: 'Shop address', pin: 'PIN code',
   openTime: 'Opens at', closeTime: 'Closes at', instagram: 'Instagram link', facebook: 'Facebook link',
+  flatFee: 'Flat delivery fee (₹)',
   ratePerKm: 'Charge per km (₹)', roundUpKm: 'Round the distance up to the next whole km', maxRadiusKm: 'Delivery area limit (km)',
   dailyCapacity: 'Most open orders you can handle at once', promiseHours: 'Usual delivery time (hours)', blackoutDates: "Dates you can't deliver",
   baseLat: 'Shop latitude (optional)', baseLng: 'Shop longitude (optional)', freeWithinBasePin: "Free delivery inside the shop's own PIN code",
@@ -56,6 +57,8 @@ const nameFor = (path: string) => {
   return LABELS[path.split('.').slice(-2).join('.')] ?? LABELS[k] ?? label(k.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase());
 };
 const TEXTAREA = new Set(['privacyText', 'termsText', 'footerText', 'announcement', 'upiNote', 'address', 'a', 'text']);
+// What an empty value means for each nullable number field; most just mean "no limit".
+const NULL_HINT: Record<string, string> = { flatFee: 'charging by distance', baseLat: 'not set', baseLng: 'not set' };
 
 let fieldSeq = 0;
 function Field({ path, v, onChange }: { path: string; v: any; onChange: (v: any) => void }) {
@@ -67,7 +70,7 @@ function Field({ path, v, onChange }: { path: string; v: any; onChange: (v: any)
   if (/Url$/.test(k)) return <div><span className="label">{name}</span><ImageField name={name} value={v} onChange={onChange} /></div>;
   if (typeof v === 'number' || v === null) {
     return (
-      <div><label htmlFor={id} className="label">{name}{v === null && <span className="font-normal text-ink/50"> (no limit)</span>}</label>
+      <div><label htmlFor={id} className="label">{name}{v === null && <span className="font-normal text-ink/50"> ({NULL_HINT[k] ?? 'no limit'})</span>}</label>
         <input id={id} type="number" step="any" className="input max-w-xs" value={v ?? ''} onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))} /></div>
     );
   }
@@ -114,7 +117,7 @@ function ListField({ path, v, onChange }: { path: string; v: any[]; onChange: (v
 const TABS: { key: string; name: string; icon: LucideIcon; help: string }[] = [
   { key: 'brand', name: 'Brand', icon: Store, help: 'Business name, tagline, logo and browser-tab icon shown across the shop.' },
   { key: 'contact', name: 'Contact', icon: Phone, help: 'WhatsApp number for orders, phone, address and opening hours. The address is also where delivery distance is measured from.' },
-  { key: 'delivery', name: 'Delivery', icon: Truck, help: 'Charge per km, delivery area and blackout dates. Base latitude and longitude are optional; without them the Contact address is looked up.' },
+  { key: 'delivery', name: 'Delivery', icon: Truck, help: 'With a flat fee set, every order is charged the same amount and the per-km fields below it are ignored. Clear the flat fee to charge by road distance instead — that needs a maps provider (ORS_API_KEY) or orders go to manual review.' },
   { key: 'payment', name: 'Payment', icon: Wallet, help: 'Which payment methods customers see, and your UPI ID.' },
   { key: 'costs', name: 'Costs', icon: Fuel, help: 'Used only for fuel cost in reports. Without both values, estimated profit is overstated and reports say so.' },
   { key: 'site', name: 'Site content', icon: FileText, help: 'Announcement bar, how-it-works steps, FAQ, footer and policy text.' },

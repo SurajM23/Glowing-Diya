@@ -144,7 +144,7 @@ export default function Checkout() {
                 {est.saved > 0 && <p className="text-sm text-green-800">You save {money(est.saved, site.currency)}</p>}
                 <div className="flex justify-between border-t border-dark/10 pt-3 text-sm"><span>Products</span><span>{money(est.subtotal, site.currency)}</span></div>
                 <div className="flex justify-between text-sm">
-                  <span>Delivery{est.delivery?.status === 'ok' && est.delivery.billedKm != null ? ` (${est.delivery.billedKm} km × ${money(est.delivery.ratePerKm, site.currency)})` : ''}</span>
+                  <span>Delivery{est.delivery?.status === 'ok' && est.delivery.billedKm != null ? ` (${est.delivery.billedKm} km × ${money(est.delivery.ratePerKm, site.currency)})` : est.delivery?.status === 'ok' ? ' (flat rate)' : ''}</span>
                   <span>{!addressReady ? 'Enter address' : est.delivery?.status === 'ok' ? money(est.deliveryFee, site.currency) : 'To be confirmed'}</span>
                 </div>
                 <div className="flex justify-between border-t border-dark/10 pt-3 text-lg font-bold">

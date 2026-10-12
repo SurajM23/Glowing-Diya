@@ -3,6 +3,7 @@ import type { Db, Q } from '../db';
 import { lineTotal, savings, validQuantity, type Tier } from './pricing';
 import { quoteDelivery, withinHours, type Quote, type Router, defaultRouter } from './delivery';
 import { audit, type Settings } from './settings';
+import { istDateStamp } from './time';
 
 export const ORDER_STATUSES = [
   'new_enquiry', 'awaiting_confirmation', 'confirmed', 'preparing',
@@ -125,10 +126,8 @@ export interface CreateOrderInput extends EstimateInput {
 }
 
 function makeRef(prefix: string) {
-  const d = new Date();
-  const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
   const rand = randomBytes(3).toString('hex').toUpperCase();
-  return `${prefix}-${ymd}-${rand}`;
+  return `${prefix}-${istDateStamp()}-${rand}`;
 }
 
 export async function createOrder(db: Db, s: Settings, input: CreateOrderInput, idempotencyKey: string, router?: Router | null) {
@@ -214,7 +213,7 @@ export function whatsappLink(s: Settings, order: any): string | null {
     ...order.items.map((i: any) => `${i.name} x ${i.quantity} @ Rs.${i.unit_price}`),
     `Products: Rs.${order.subtotal}`,
     order.quote?.status === 'ok'
-      ? `Delivery (${order.quote.billed_km} km est.): Rs.${order.delivery_fee}`
+      ? `Delivery${order.quote.billed_km != null ? ` (${order.quote.billed_km} km est.)` : ''}: Rs.${order.delivery_fee}`
       : 'Delivery: to be confirmed by owner',
     `${order.quote?.status === 'ok' ? 'Estimated total' : 'Products total (delivery extra)'}: Rs.${order.total}`,
     `Name: ${order.customer_name}`,

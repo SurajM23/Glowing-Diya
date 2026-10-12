@@ -1,5 +1,6 @@
 import { env } from '../config';
 import type { Settings } from './settings';
+import { istMinutesSinceMidnight } from './time';
 
 export type QuoteStatus = 'ok' | 'manual_review' | 'out_of_range';
 
@@ -108,6 +109,15 @@ export async function quoteDelivery(
   router: Router | null = defaultRouter(),
 ): Promise<Quote> {
   const inBasePin = pin === s.contact.pin;
+  if (s.delivery.flatFee != null) {
+    // No distance provider involved: every order is charged the same fee, with no manual review
+    // and no area limit (maxRadiusKm has no effect while a flat fee is set).
+    return {
+      status: 'ok', provider: 'flat', distanceKm: null, billedKm: null, ratePerKm: 0,
+      fee: s.delivery.freeWithinBasePin && inBasePin ? 0 : s.delivery.flatFee,
+      lat: null, lng: null, note: `Flat delivery fee of ${s.delivery.flatFee}.`,
+    };
+  }
   if (!router) return buildQuote(null, 'none', s.delivery, inBasePin);
   try {
     const d = await router.distance(
@@ -121,9 +131,9 @@ export async function quoteDelivery(
   }
 }
 
-/** True when `at` (server local time) falls inside the configured business hours. */
+/** True when `at` falls inside the configured business hours, in India time regardless of the server's own clock. */
 export function withinHours(open: string, close: string, at: Date) {
-  const m = at.getHours() * 60 + at.getMinutes();
+  const m = istMinutesSinceMidnight(at);
   const [oh, om] = open.split(':').map(Number);
   const [ch, cm] = close.split(':').map(Number);
   return m >= oh * 60 + om && m < ch * 60 + cm;

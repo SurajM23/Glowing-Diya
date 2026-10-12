@@ -25,6 +25,9 @@ export async function openDb(opts: { memory?: boolean } = {}): Promise<Db> {
     const pool = new pg.Pool({
       connectionString: env.databaseUrl,
       ssl: /localhost|127\.0\.0\.1/.test(env.databaseUrl) ? undefined : { rejectUnauthorized: false },
+      // The business runs on India time; every connection starts in that zone so now()/CURRENT_DATE
+      // ("orders today", report date ranges, expense dates) agree with the owner's clock.
+      options: '-c TimeZone=Asia/Kolkata',
     });
     return {
       q: async (sql, params) => (await pool.query(sql, params as any[])).rows,
@@ -49,6 +52,7 @@ export async function openDb(opts: { memory?: boolean } = {}): Promise<Db> {
   if (dir) fs.mkdirSync(path.dirname(dir), { recursive: true });
   const lite = new PGlite(dir);
   await lite.waitReady;
+  await lite.query("SET TIME ZONE 'Asia/Kolkata'");
   return {
     q: async (sql, params) => (await lite.query(sql, params as any[])).rows as any[],
     tx: (fn) => lite.transaction((t) => fn(async (sql, params) => (await t.query(sql, params as any[])).rows as any[])),
